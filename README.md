@@ -39,7 +39,7 @@ pip install -r requirements.txt
 
 Our model requires an assembly file and annotation databases to assist in locating genes and their strands. Therefore, we kindly ask you to follow the instructions carefully and download the listed files.
 
-**step 1: Download the Ensemble genome assembly file**
+#### step 1: Download the Ensemble genome assembly file
 
 ```shell
 # download
@@ -55,21 +55,23 @@ After getting the fa files, we need to use samtools to build the index. Please m
 samtools faidx GRCh38.p14.genome.fa
 ```
 
-**step 2: Download PhyloP annotation data**
+#### step 2: Download PhyloP annotation data
 
 ```shell
 wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/phyloP100way/hg38.phyloP100way.bw
 ```
 
-**step 3: Download annotation data and trained model files**
+#### step 3: Download annotation data and trained model files
 
 Due to GitHub's data limitations, we have placed some annotation files and pre-trained model files in a cloud storage drive to provide users with the ability to download them and facilitate the reproduction of the project.
+```commandline
+https://pan.baidu.com/s/1Y5Y5FGSJm7FXnAUVfXdKhQ?pwd=cj3u
+```
 
-``https://pan.baidu.com/s/1Y5Y5FGSJm7FXnAUVfXdKhQ?pwd=cj3u``
 
 ## 2. usage
 
-### 2.1 input file
+### 2.1 features Annotation
 
 To run the data annotation file, you need to prepare a tab-delimited annotation input site file. 
 This file is the target file that you want to annotate. The format and content of the input file are as follows:
@@ -84,26 +86,15 @@ This file is the target file that you want to annotate. The format and content o
 
 Also, if you only want to use it for testing purposes, you can first use the file located in the local path: ``dataset/toy.vcf``
 
-### 2.2 features Annotation
-
-The feature annotations perform tokenization of numerical and sequence features on the target input file. The resulting feature data will be saved in 'toy.features.vcf' and 'toy.seqIds.json'.
+The feature annotations perform tokenization of numerical and sequence features on the target input file. The resulting feature data will be saved in ``toy.features.vcf`` and ``toy.seqIds.json``
 
 ```shell
 python features/data_annotation.py -i toy.vcf -vcf toy.features.tsv -seq toy.seqIds.json
 ```
 
-### 2.3 Annotate variants
+### 2.2 Annotate variants
 Run **predict.py** to predict mutation effects. 
 
 ```shell
 python predict/predict.py -vcf toy.features.tsv -seq toy.seqIds.json -o toy.predict.tsv
 ```
-
-
-[//]: # "### 1.2.4 models Requirements"
-
-[//]: # "We have saved the weight files of the model on the cloud storage website."
-
-[//]: # ">-  scaler 数据minmax预处理"
-
-[//]: # ">- weight.pkl 模型"
