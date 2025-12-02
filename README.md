@@ -4,7 +4,7 @@ Follow these steps to get the model up and running on your local machine.
 ## 1.1 Clone Repository
 
 ```shell
-git clone link
+git clone https://github.com/evenaaa/FusionSpliceFormer.git
 cd FusionSpliceFormer
 ```
 
@@ -100,10 +100,10 @@ python predict/predict.py -vcf toy.features.tsv -seq toy.seqIds.json -o toy.pred
 ```
 
 
-[//]: # (### 1.2.4 models Requirements)
+[//]: # "### 1.2.4 models Requirements"
 
-[//]: # (We have saved the weight files of the model on the cloud storage website.)
+[//]: # "We have saved the weight files of the model on the cloud storage website."
 
-[//]: # (>-  scaler 数据minmax预处理)
+[//]: # ">-  scaler 数据minmax预处理"
 
-[//]: # (>- weight.pkl 模型)
+[//]: # ">- weight.pkl 模型"
