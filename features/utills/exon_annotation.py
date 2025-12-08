@@ -53,13 +53,6 @@ def get_dis(pos,boundary,col_name):
             dis=dis-1
     return dis
 
-
-def get_region3(region_da,pos,exon_start,exon_end):
-    region3=region_da
-    if pos>=exon_start and pos<=exon_end:
-        region3='exonic'
-    return region3
-
 # gtf annotation
 def gtf_annotation(pos,nm_id,gtf_df,ts_MANE):
     is_tsmatch=0
@@ -104,13 +97,12 @@ def gtf_annotation(pos,nm_id,gtf_df,ts_MANE):
             aim_exon['transcript_name'],aim_exon['exon_number'],aim_exon['exon_counts'],aim_exon['protein_id'],aim_exon['exon_id']
         region=get_donor_acceptor(strand,col_name)
         dis=get_dis(pos,boundary,col_name)
-        region3=get_region3(region_da=region, pos=pos,exon_start=exon_start,exon_end=exon_end)
         next_boundary=None
         if exon_number<exon_counts and region=='donor':
             next_exon = gtf_ts_df.loc[specified_index + 1]
             next_boundary=next_exon[col_name]
 
-        gtf_annotation_list=[boundary,dis,region,region3,exon_start,exon_end,next_boundary,ts_start,ts_end,strand,gene_id,transcript_id,refseq_ts_id,gene_name,level,isMANESelect,transcript_name,exon_number,\
+        gtf_annotation_list=[boundary,dis,region,exon_start,exon_end,next_boundary,ts_start,ts_end,strand,gene_id,transcript_id,refseq_ts_id,gene_name,level,isMANESelect,transcript_name,exon_number,\
             exon_counts,protein_id,exon_id]
     return is_tsmatch,gtf_annotation_list
 
@@ -176,8 +168,7 @@ def list2csv(outputdata, csv_file_path):
             csvfile.write(line + '\n')
     print(f'Crete BedTools input file : {csv_file_path}')
 
-def get_bed_region(variant_path,base400_fileinpath,r_fileinpath,r_slidingwindow_fileinpath,r_next_fileinpath,esr_fileinpath,spliceaid_fileinpath,\
-                   maxentscan_fileinpath,
+def get_bed_region(variant_path,base400_fileinpath,r_fileinpath,r_slidingwindow_fileinpath,r_next_fileinpath,esr_fileinpath,maxentscan_fileinpath,
                    gtf_path='dataset/annodata/gtf/gencode.v47.refseq.ec.gtf',):
     # gtf
     gtf=pd.read_csv(gtf_path,sep='\t')
@@ -196,7 +187,7 @@ def get_bed_region(variant_path,base400_fileinpath,r_fileinpath,r_slidingwindow_
 
     # add new cols
     gtf_columns=[
-    'boundary','dis','region_da','region3','exon_start', 'exon_end', 'next_next_boundary',
+    'boundary','dis','region','exon_start', 'exon_end', 'next_next_boundary',
      'ts_start', 'ts_end', 'strand', 'gene_id', 'transcript_id','refseq_ts_id', 'gene_name',
      'level', 'isMANESelect', 'transcript_name', 'exon_number', 'exon_counts', 'protein_id', 'exon_id']
     for col in gtf_columns:
@@ -207,7 +198,6 @@ def get_bed_region(variant_path,base400_fileinpath,r_fileinpath,r_slidingwindow_
     r_slidingwindow_outputlist = []
     r_next_outputlist=[]
     esr_outputlist = []
-    spliceaid_outputlist = []
     maxentscan_outputlist = []
 
     # mapping in chr
@@ -224,7 +214,7 @@ def get_bed_region(variant_path,base400_fileinpath,r_fileinpath,r_slidingwindow_
             ts_id=row['nm_id']
             is_tsmatch, gtf_annotation_list=gtf_annotation( pos, ts_id, gtf_chrom,ts_MANE_chrom)
             if is_tsmatch:
-                boundary,dis,region_da,region3, exon_start, exon_end, next_boundary, ts_start, ts_end, strand, gene_id, transcript_id,\
+                boundary,dis,region_da, exon_start, exon_end, next_boundary, ts_start, ts_end, strand, gene_id, transcript_id,\
                     refseq_ts_id, gene_name, level, isMANESelect, transcript_name, exon_number, exon_counts, protein_id, exon_id \
                 =gtf_annotation_list
                 if abs(dis)<=100:
@@ -258,16 +248,7 @@ def get_bed_region(variant_path,base400_fileinpath,r_fileinpath,r_slidingwindow_
                     esr_outputlist.append(esr_outline)
 
                     # --------------
-                    # --3.spliceAid-
-                    # --------------
-                    length=100
-                    spliceaid_start = pos - length
-                    spliceaid_end = pos + length+dis_refalt
-                    spliceaid_outline = [chrom_str, str(int(spliceaid_start)), str(int(spliceaid_end))]
-                    spliceaid_outputlist.append(spliceaid_outline)
-
-                    # --------------
-                    # --4.maxentscan-
+                    # --3.maxentscan-
                     # --------------
                     maxentscan_start, maxentscan_end = get_maxentscan_start_end(strand, region_da, boundary , dis_refalt)
                     maxentscan_outline = [chrom_str, maxentscan_start, maxentscan_end]
@@ -290,20 +271,18 @@ def get_bed_region(variant_path,base400_fileinpath,r_fileinpath,r_slidingwindow_
     list2csv(r_slidingwindow_outputlist, r_slidingwindow_fileinpath)
     list2csv(r_next_outputlist,r_next_fileinpath)
     list2csv(esr_outputlist, esr_fileinpath)
-    list2csv(spliceaid_outputlist, spliceaid_fileinpath)
     list2csv(maxentscan_outputlist, maxentscan_fileinpath)
     variant_gtf_df = variant_df[variant_df['boundary'].notnull()]
     return variant_gtf_df
 
 # get all sequence data for preparing feature annotaion
-def save_seq(base400_fileinpath,r_fileinpath,r_slidingwindow_fileinpath,r_next_fileinpath,esr_fileinpath,spliceaid_fileinpath,maxentscan_fileinpath,
-             base400_fileoutpath,r_fileoutpath,r_slidingwindow_fileoutpath,r_next_fileoutpath,esr_fileoutpath,spliceaid_fileoutpath,maxentscan_fileoutpath):
+def save_seq(base400_fileinpath,r_fileinpath,r_slidingwindow_fileinpath,r_next_fileinpath,esr_fileinpath,maxentscan_fileinpath,
+             base400_fileoutpath,r_fileoutpath,r_slidingwindow_fileoutpath,r_next_fileoutpath,esr_fileoutpath,maxentscan_fileoutpath):
     get_fasta_sequence(bedin_file_path=base400_fileinpath, bedout_file_path=base400_fileoutpath)
     get_fasta_sequence(bedin_file_path=r_fileinpath, bedout_file_path=r_fileoutpath)
     get_fasta_sequence(bedin_file_path=r_slidingwindow_fileinpath, bedout_file_path=r_slidingwindow_fileoutpath)
     get_fasta_sequence(bedin_file_path=r_next_fileinpath,bedout_file_path=r_next_fileoutpath)
     get_fasta_sequence(bedin_file_path=esr_fileinpath, bedout_file_path=esr_fileoutpath)
-    get_fasta_sequence(bedin_file_path=spliceaid_fileinpath, bedout_file_path=spliceaid_fileoutpath)
     get_fasta_sequence(bedin_file_path=maxentscan_fileinpath, bedout_file_path=maxentscan_fileoutpath)
 
 def get_fasta_sequence(bedin_file_path,bedout_file_path,fasta_file = 'dataset/annodata/fa/GRCh38.p14.genome.fa'):
@@ -369,31 +348,29 @@ def get_r_next_fillnull(r_next_df,variant_df):
     else:
         print("The number of rows in r_next_df does not match the number of indices that meet the conditions, so the index cannot be modified.")
 
-def merge_variant(variant_gtf_df,base400_fileoutpath,r_fileoutpath,r_slidingwindow_fileoutpath,r_next_fileoutpath,esr_fileoutpath,spliceaid_fileoutpath,maxentscan_fileoutpath):
+def merge_variant(variant_gtf_df,base400_fileoutpath,r_fileoutpath,r_slidingwindow_fileoutpath,r_next_fileoutpath,esr_fileoutpath,maxentscan_fileoutpath):
     # data input
     base400_origindf=pd.read_csv(base400_fileoutpath,sep='\t',header=None,names=['base400'])
     r_origindf=pd.read_csv(r_fileoutpath,sep='\t',header=None,names=['r'])
     r_slidingwindow_origindf=pd.read_csv(r_slidingwindow_fileoutpath,sep='\t',header=None,names=['r_sw'])
     r_next_origindf=pd.read_csv(r_next_fileoutpath,sep='\t',header=None,names=['r_next'])
     esr_origindf=pd.read_csv(esr_fileoutpath,sep='\t',header=None,names=['esr'])
-    spliceaid_origindf=pd.read_csv(spliceaid_fileoutpath,sep='\t',header=None,names=['spliceaid'])
     maxentscan_origindf=pd.read_csv(maxentscan_fileoutpath,sep='\t',header=None,names=['mes'])
     # sepertate bedoutdata:location & seq
     base400_df=get_bed_seq(base400_origindf)
 
+    esr_df=get_bed_seq(esr_origindf)
     r_df=get_bed_seq(r_origindf)
     r_slidingwindow_df=get_bed_seq(r_slidingwindow_origindf)
     r_next_df=get_bed_seq(r_next_origindf)
     r_next_df=get_r_next_fillnull(r_next_df,variant_gtf_df)
 
-    esr_df=get_bed_seq(esr_origindf)
-    spliceaid_df=get_bed_seq(spliceaid_origindf)
     maxentscan_df=get_bed_seq(maxentscan_origindf)
 
     # concat DataFrame
-    variant_combined = pd.concat([variant_gtf_df,base400_df,r_df, r_slidingwindow_df,r_next_df,esr_df,spliceaid_df,maxentscan_df], axis=1)
+    variant_combined = pd.concat([variant_gtf_df,base400_df,r_df, r_slidingwindow_df,r_next_df,esr_df,maxentscan_df], axis=1)
 
-    delete_path_list=[base400_fileoutpath,r_fileoutpath,r_slidingwindow_fileoutpath,r_next_fileoutpath,esr_fileoutpath,spliceaid_fileoutpath,maxentscan_fileoutpath]
+    delete_path_list=[base400_fileoutpath,r_fileoutpath,r_slidingwindow_fileoutpath,r_next_fileoutpath,maxentscan_fileoutpath]
     for delete_path in delete_path_list:
         try:
             os.remove(delete_path)
@@ -419,7 +396,6 @@ def exon_annotation(
     r_slidingwindow_fileinpath=beddata_path+'bedin.r_slidingwindow.txt'
     r_next_fileinpath=beddata_path+'bedin.r_next.txt'
     esr_fileinpath=beddata_path+'bedin.esr.txt'
-    spliceaid_fileinpath=beddata_path+'bedin.spliceaid.txt'
     maxentscan_fileinpath=beddata_path+'bedin.maxentscan.txt'
     #------------------------
     # bedout
@@ -428,17 +404,15 @@ def exon_annotation(
     r_slidingwindow_fileoutpath=beddata_path+'bedout.r_slidingwindow.txt'
     r_next_fileoutpath=beddata_path+'bedout.r_next.txt'
     esr_fileoutpath=beddata_path+'bedout.esr.txt'
-    spliceaid_fileoutpath=beddata_path+'bedout.spliceaid.txt'
     maxentscan_fileoutpath=beddata_path+'bedout.maxentscan.txt'
 
 
-    variant_gtf_df=get_bed_region(variant_path,base400_fileinpath,r_fileinpath,r_slidingwindow_fileinpath,r_next_fileinpath,esr_fileinpath,\
-                   spliceaid_fileinpath,maxentscan_fileinpath)
+    variant_gtf_df=get_bed_region(variant_path,base400_fileinpath,r_fileinpath,r_slidingwindow_fileinpath,r_next_fileinpath,esr_fileinpath,maxentscan_fileinpath)
 
     # get bedtools dataoutput
-    save_seq(base400_fileinpath,r_fileinpath,r_slidingwindow_fileinpath,r_next_fileinpath,esr_fileinpath,spliceaid_fileinpath,maxentscan_fileinpath,
-             base400_fileoutpath,r_fileoutpath,r_slidingwindow_fileoutpath,r_next_fileoutpath,esr_fileoutpath,spliceaid_fileoutpath,maxentscan_fileoutpath)
+    save_seq(base400_fileinpath,r_fileinpath,r_slidingwindow_fileinpath,r_next_fileinpath,esr_fileinpath,maxentscan_fileinpath,
+             base400_fileoutpath,r_fileoutpath,r_slidingwindow_fileoutpath,r_next_fileoutpath,esr_fileoutpath,maxentscan_fileoutpath)
 
-    merge_df=merge_variant(variant_gtf_df,base400_fileoutpath,r_fileoutpath,r_slidingwindow_fileoutpath,r_next_fileoutpath,esr_fileoutpath,spliceaid_fileoutpath,maxentscan_fileoutpath)
+    merge_df=merge_variant(variant_gtf_df,base400_fileoutpath,r_fileoutpath,r_slidingwindow_fileoutpath,r_next_fileoutpath,esr_fileoutpath,maxentscan_fileoutpath)
 
     return merge_df

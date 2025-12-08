@@ -4,7 +4,6 @@
 # @Author  : even
 # @File    : features_annotation.py
 from utills.get_r import *
-from utills.get_rbp import *
 from utills.load_data import *
 from utills.get_mes_score5 import get_score5
 from utills.get_mes_score3 import get_score3
@@ -33,19 +32,19 @@ def get_mes_altseq(pos,mes_location,mes_seq,alt):
         altseq=mes_seq
     return altseq
 
-def get_messcores(mes_seq,region_da,mes3dict,mes5dict):
-    if region_da=='donor':
+def get_messcores(mes_seq,region,mes3dict,mes5dict):
+    if region=='donor':
         mes_score=get_score5(mes_seq,mes5dict)
-    elif region_da=='acceptor':
+    elif region=='acceptor':
         mes_score=get_score3(mes_seq,mes3dict)
     return mes_score
 
-def get_mes_features(strand,mes_seq,alt,pos,mes_location,region_da,mes3dict,mes5dict):
+def get_mes_features(strand,mes_seq,alt,pos,mes_location,region,mes3dict,mes5dict):
     mes_refseq = get_strand_seq(strand, mes_seq)
     mes_altseq = get_mes_altseq(pos, mes_location, mes_seq, alt)
     mes_altseq = get_strand_seq(strand, mes_altseq)
-    mes_ref = get_messcores(mes_refseq, region_da, mes3dict, mes5dict)
-    mes_alt = get_messcores(mes_altseq, region_da, mes3dict, mes5dict)
+    mes_ref = get_messcores(mes_refseq, region, mes3dict, mes5dict)
+    mes_alt = get_messcores(mes_altseq, region, mes3dict, mes5dict)
     diffrence_mes = mes_alt - mes_ref
     relative_mes=get_relative_score(refscore=mes_ref,altscore=mes_alt)
 
@@ -61,23 +60,18 @@ def features_annotation(gtf_df,feature_path='dataset/annodata/merge.features.txt
 
     # esr dict
     esr_dict = load_data_esr_dict()
+
     # mes dict
     mes5dict=load_data_mes5dict()
     mes3dict=load_data_mes3dict()
-
-    # rbp: spliceaid df
-    rbp_df = load_data_spliceaid()
 
     # phyloP100
     bw=load_data_phylop()
 
     # create new df
     # 选取指定的列创建新的 DataFrame
-    basic_columns = ['chrom', 'pos', 'ref', 'alt', 'boundary', 'dis', 'region_da','region3',
-                    'exon_start', 'exon_end', 'ts_start', 'ts_end', 'strand',
-                    'gene_id', 'transcript_id', 'refseq_ts_id', 'gene_name',
-                    'transcript_name', 'exon_number', 'exon_counts', 'protein_id',
-                    'exon_id']
+    basic_columns = ['chrom', 'pos', 'ref', 'alt',  'region',
+                    'strand','gene_id', 'refseq_ts_id', 'gene_name','dis']
     feature_df = gtf_df[basic_columns]
 
     for idx,row in gtf_df.iterrows():
@@ -92,7 +86,7 @@ def features_annotation(gtf_df,feature_path='dataset/annodata/merge.features.txt
         strand=row['strand']
         ref=row['ref'].upper()
         alt=row['alt'].upper()
-        region_da=row['region_da']
+        region=row['region']
 
         r_seq=row['r_seq'].upper()
         r_location=row['r_location']
@@ -104,10 +98,10 @@ def features_annotation(gtf_df,feature_path='dataset/annodata/merge.features.txt
         r_sw_seq = row['r_sw_seq'].upper()
         r_next_seq=str(row['r_next_seq']).upper()
 
+
         esr_seq=row['esr_seq'].upper()
         mes_seq=row['mes_seq'].upper()
         mes_location=row['mes_location']
-        rbp_seq=row['spliceaid_seq'].upper()
         #----------------------------------------------------------------------------------------
         #--------------------------------get features data---------------------------------------
         #----------------------------------------------------------------------------------------
@@ -122,7 +116,7 @@ def features_annotation(gtf_df,feature_path='dataset/annodata/merge.features.txt
         # ri_can_ref, ri_can_alt, difference_ri_can, relative_ri_can,
         #                      max_Ri_cryptic_donor_window_ref, max_Ri_cryptic_donor_window_alt, difference_ri_crypt,relative_ri_crypt,
         #                      difference_r_next
-        r_scores_list = get_r_features(strand, r_seq, pos, alt, region_da, r_location, donor_freq_matrix,
+        r_scores_list = get_r_features(strand, r_seq, pos, alt, region, r_location, donor_freq_matrix,
                                        acceptor_freq_matrix,r_sw_seq, r_freq_location, r_freq_seq, r_next_seq,ref)
         feature_df.loc[idx, ['ri_can_ref', 'ri_can_alt', 'diff_ri_can', 'relative_ri_can',
                      'max_Ri_cryptic_donor_window_ref', 'max_Ri_cryptic_donor_window_alt', 'diff_ri_crypt','relative_ri_crypt',
@@ -134,21 +128,14 @@ def features_annotation(gtf_df,feature_path='dataset/annodata/merge.features.txt
                          'relative_esr']] =esrscores_list
 
         # 4.maxentscan:mes_ref, mes_alt, diffrence_mes,relative_mes
-        messcores_list=get_mes_features(strand,mes_seq,alt,pos,mes_location,region_da,mes3dict,mes5dict)
+        messcores_list=get_mes_features(strand,mes_seq,alt,pos,mes_location,region,mes3dict,mes5dict)
         feature_df.loc[idx, ['mes_ref', 'mes_alt', 'diff_mes','relative_mes']] =messcores_list
 
-        # 5.rbp:ref_pos_rbpscore,ref_neg_rbpscore,alt_pos_rbpscore,alt_neg_rbpscore,ref_rbpscore,alt_rbpscore,difference_rbpscore,relative_rbpscore
-        rbp_refseq=get_strand_seq(strand,rbp_seq)
-        rbp_altseq=get_rbp_altseq(rbp_seq,alt)
-        rbpscores_list=get_rbp_scores(refseq=rbp_refseq, altseq=rbp_altseq, rbp_df=rbp_df)
-        feature_df.loc[idx, ['ref_pos_rbpscore','ref_neg_rbpscore','alt_pos_rbpscore','alt_neg_rbpscore','ref_rbpscore','alt_rbpscore',
-                         'diff_rbpscore','relative_rbpscore']] =rbpscores_list
-
-        # 6.phyloP
+        # 5.phyloP
         phylop_score=get_phylop_score(bw, chrom, pos)
         feature_df.loc[idx, ['phylop_score']] =phylop_score
 
-        # 7.seq 400bp
+        # 6.seq 400bp
         base400_refseq=row['base400_seq'].upper()
         base400_location=row['base400_location']
         feature_df.loc[idx, ['base400_refseq']] =base400_refseq

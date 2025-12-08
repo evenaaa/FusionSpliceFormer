@@ -107,15 +107,11 @@ def seq_tokenize(
 
     acceptor_ref_ids, acceptor_alt_ids=make_dataloader(
         tokenizers_path=f'{tokenizers_path}/acceptor/tokenizers.pkl',
-        df=feature_df[feature_df['region3']=='acceptor']
+        df=feature_df[feature_df['region']=='acceptor']
     )
     donor_ref_ids, donor_alt_ids=make_dataloader(
         tokenizers_path=f'{tokenizers_path}/donor/tokenizers.pkl',
-        df=feature_df[feature_df['region3']=='donor']
-    )
-    exonic_ref_ids, exonic_alt_ids=make_dataloader(
-        tokenizers_path=f'{tokenizers_path}/exonic/tokenizers.pkl',
-        df=feature_df[feature_df['region3']=='exonic']
+        df=feature_df[feature_df['region']=='donor']
     )
 
     seq_ids_dict={
@@ -123,7 +119,5 @@ def seq_tokenize(
         'acceptor_alt_ids':acceptor_alt_ids,
         'donor_ref_ids':donor_ref_ids,
         'donor_alt_ids':donor_alt_ids,
-        'exonic_ref_ids':exonic_ref_ids,
-        'exonic_alt_ids':exonic_alt_ids
     }
     json.dump(seq_ids_dict, open(seq_path, 'w', encoding='utf-8'), ensure_ascii=False)

@@ -39,7 +39,7 @@ def data_annotation():
     print_prompt(step=3,prompt='Seq Tokenize')
     seq_tokenize(
             feature_df=feature_df,
-            token_path=seq_path,
+            seq_path=seq_path,
             tokenizers_path='dataset/modeldata',
     )
 

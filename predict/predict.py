@@ -35,7 +35,6 @@ class DLDataset(Dataset):
 
     def __len__(self):
         return len(self.inputs['x'])
-        # return len(self.inputs['labels'])
 
 def make_test_dataloader(
         scaler_path,
@@ -66,22 +65,18 @@ def make_test_dataloader(
 
 def load_region_features(df,regionname):
     region_dict={
-    # 32
+    # 24
     'acceptor':[
-        'dis',
-        'exon_length','exon_length_mod3',
+        'dis','exon_length','exon_length_mod3',
         'ri_can_ref','ri_can_alt',
         'diff_ri_can','relative_ri_can','max_Ri_cryptic_donor_window_ref',
         'max_Ri_cryptic_donor_window_alt','diff_ri_crypt','relative_ri_crypt',
         'ese_ref','ese_alt','ess_ref','ess_alt','diff_refesr','diff_altesr',
         'diff_esr','relative_esr',
         'mes_ref','mes_alt','diff_mes','relative_mes',
-        'ref_pos_rbpscore','ref_neg_rbpscore','alt_pos_rbpscore','alt_neg_rbpscore',
-        'ref_rbpscore','alt_rbpscore','diff_rbpscore','relative_rbpscore',
         'phylop_score'
         ],
-
-        # 29
+    # 17
     'donor':[
         'dis','exon_length','exon_length_mod3',
         'ri_can_ref','ri_can_alt',
@@ -89,24 +84,8 @@ def load_region_features(df,regionname):
          'max_Ri_cryptic_donor_window_alt','diff_ri_crypt','relative_ri_crypt',
          'diff_r_next',
          'mes_ref','mes_alt','diff_mes','relative_mes',
-         'ref_pos_rbpscore',
-         'ref_neg_rbpscore','alt_pos_rbpscore','alt_neg_rbpscore','ref_rbpscore',
-         'alt_rbpscore','diff_rbpscore','relative_rbpscore',
         'phylop_score'
-         ],
-    # 33
-    'exonic':[
-        'dis','exon_length','exon_length_mod3','ri_can_ref','ri_can_alt','diff_ri_can',
-        'relative_ri_can','max_Ri_cryptic_donor_window_ref','max_Ri_cryptic_donor_window_alt',
-        'diff_ri_crypt','relative_ri_crypt','diff_r_next',
-        'ese_ref','ese_alt','ess_ref',
-        'ess_alt','diff_refesr','diff_altesr','diff_esr','relative_esr',
-        'mes_ref','mes_alt','diff_mes','relative_mes',
-        'ref_pos_rbpscore','ref_neg_rbpscore',
-        'alt_pos_rbpscore','alt_neg_rbpscore','ref_rbpscore','alt_rbpscore','diff_rbpscore',
-        'relative_rbpscore',
-        'phylop_score'
-        ]
+         ]
     }
     df=df[region_dict[regionname]]
     manu_dim=len(region_dict[regionname])
@@ -144,29 +123,26 @@ def predict(
 
 def region_predict(
         features_file='dataset/toy.features.vcf',
-        seq_file='dataset/seq_ids.json',
+        seq_file='dataset/toy.seqIds.json',
         pred_file='dataset/pred.csv'
 ):
     regionnames=[
         'acceptor',
         'donor',
-        'exonic',
     ]
 
     modelpath='dataset/modeldata'
     pred_cols=[
-        'chrom','pos','ref','alt','region3','exon_start','exon_end','ts_start','ts_end','strand',
-        'gene_id','transcript_id','refseq_ts_id','gene_name','transcript_name','exon_number',
-        'exon_counts','protein_id','exon_id'
-    ]
+        'chrom','pos','ref','alt','region','strand','gene_id','gene_name']
     features_df=pd.read_csv(features_file,sep='\t')
     pred_df=features_df[pred_cols]
+    # print('pred_df',pred_df)
     pred_df['pred_label']=None
     pred_df['pred_prob']=None
     with open(seq_file, 'r', encoding='utf-8') as f:
         seq_ids = json.load(f)
     for regionname in regionnames:
-        region_features_df=features_df[features_df['region3']==regionname]
+        region_features_df=features_df[features_df['region']==regionname]
         manu_dim,manu_feature=load_region_features(region_features_df,regionname)
         manu_feature = manu_feature.fillna(manu_feature.mean())
         ref_sequence =seq_ids[regionname+'_ref_ids']
@@ -180,7 +156,7 @@ def region_predict(
             manu_dim=manu_dim
         )
 
-        mask = pred_df['region3'] == regionname
+        mask = pred_df['region'] == regionname
         if len(pred_labels) == mask.sum():
             pred_df.loc[mask, 'pred_label'] = pred_labels
             pred_df.loc[mask, 'pred_prob'] = pred_prob
@@ -191,12 +167,12 @@ def region_predict(
         print(pred_df['pred_prob'])
         print_prompt(regionname)
     print(pred_df)
-    pred_df.to_csv(pred_file,index=False,sep='\t')
+    pred_df.to_csv(pred_file,index=False)
 
 def main():
     parser = argparse.ArgumentParser(description='This is a script for prediction.')
     parser.add_argument('-vcf', help='It must have input vcf file', default=r'dataset/toy.features.vcf')
-    parser.add_argument('-seq', help='It must have input seq file', default=r'dataset/seq_ids.json')
+    parser.add_argument('-seq', help='It must have input seq file', default=r'dataset/toy.seqIds.json')
     parser.add_argument('-out', help='Prediction output file.', default=r'dataset/toy.pred.csv')
 
     # Parse command-line parameters

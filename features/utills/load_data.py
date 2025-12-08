@@ -96,19 +96,11 @@ def load_bedout_data_esr():
     esr_df=pd.read_csv(esr_fileoutpath,sep='\t',header=None,names=['esr'])
     return esr_df
 
-def load_bedout_data_spliceaid():
-    prepath=f'dataset/annodata/beddata/'
-    spliceaid_fileoutpath=prepath+'bedout.spliceaid.txt'
-    spliceaid_df=pd.read_csv(spliceaid_fileoutpath,sep='\t',header=None,names=['spliceaid'])
-    return spliceaid_df
-
 def load_bedout_data_mes():
     prepath=f'dataset/annodata/beddata/'
     maxentscan_fileoutpath=prepath+'bedout.maxentscan.txt'
     maxentscan_df=pd.read_csv(maxentscan_fileoutpath,sep='\t',header=None,names=['mes'])
     return maxentscan_df
-
-
 
 def load_data_esr_dict():
     prepath=f'dataset/annodata/'
@@ -153,13 +145,6 @@ def load_data_mes3dict():
             print(f"Can't open {file_name}!")
             return None
     return metables
-
-
-def load_data_spliceaid():
-    prepath=f'dataset/annodata/'
-    spliceaid_fileoutpath=prepath+'spliceAid_format.txt'
-    spliceaid_df=pd.read_csv(spliceaid_fileoutpath,sep='\t')
-    return spliceaid_df
 
 def load_data_phylop():
     prepath=f'dataset/annodata/PhyloP/'

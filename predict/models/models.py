@@ -61,29 +61,44 @@ class SpliceModel(nn.Module):
         self.max_k = max_k
         self.output_dim = output_dim
 
+        # Embedding layers
         self.embeddings = nn.ModuleList([
             nn.Embedding(num_embeddings=(5 ** k) + 2, embedding_dim=embedding_dim)
             for k in range(1, max_k + 1)
         ])
 
+        # Encoder layers
         self.encoders = nn.ModuleList([
             TransformerEncoder_Module(embedding_dim, seq_len, output_dim)
             for _ in range(max_k)
         ])
 
-        self.cross_attn = CrossAttention(embed_dim=output_dim)
+        # Cross Attention
+        self.cross_attn = CrossAttention(embed_dim=output_dim,num_heads=4)
 
-        self.manu_proj = nn.Linear(manu_dim, output_dim)
+        # Manual feature projection with MLP layers
+        self.manu_proj = nn.Sequential(
+            nn.Linear(manu_dim, 128),
+            nn.ReLU(),
+            nn.BatchNorm1d(128),  # BatchNorm after the first MLP layer
+            nn.Linear(128, output_dim),
+            nn.BatchNorm1d(output_dim)  # BatchNorm after the output layer
+        )
         manu_encoder_layer = nn.TransformerEncoderLayer(d_model=output_dim, nhead=4, batch_first=True)
         self.manu_encoder = nn.TransformerEncoder(manu_encoder_layer, num_layers=2)
 
         self.dropout = nn.Dropout(dropout_rate)
+
+        # Final classification layer
         # self.fc = nn.Linear(output_dim * (2 * max_k), 2)
         self.fc = nn.Linear(output_dim * (2 * max_k + 1), 2)
+        # Learning rate scheduler
+        # self.scheduler = ReduceLROnPlateau(optimizer, 'min')
 
     def forward(self, **inputs):
         features = []
 
+        # Process each k-level of sequence
         for i in range(self.max_k):
             ref = self.embeddings[i](inputs[f'ref_ids_{i + 1}']).permute(0, 2, 1)
             alt = self.embeddings[i](inputs[f'alt_ids_{i + 1}']).permute(0, 2, 1)
@@ -94,20 +109,26 @@ class SpliceModel(nn.Module):
             # Cross Attention
             ref_feat, alt_feat = self.cross_attn(ref_feat, alt_feat)
 
-            ref_pool, _ = torch.max(ref_feat, dim=1)
-            alt_pool, _ = torch.max(alt_feat, dim=1)
+            # Use mean pooling to combine features
+            # ref_pool, _ = torch.max(ref_feat, dim=1)
+            # alt_pool, _ = torch.max(alt_feat, dim=1)
+            ref_pool = torch.mean(ref_feat, dim=1)
+            alt_pool = torch.mean(alt_feat, dim=1)
             features.extend([ref_pool, alt_pool])
 
+        # Process manual features
         x = inputs['x']
         x_seq = self.manu_proj(x).unsqueeze(1)
         manu_encoded = self.manu_encoder(x_seq)
         manu_feat = manu_encoded.squeeze(1)
         features.append(manu_feat)
 
+        # Concatenate all features and apply dropout
         output = torch.cat(features, dim=1)
         output = self.dropout(output)
         logits = self.fc(output)
 
+        # Final classification layer
         loss = None
         labels = inputs.get("labels", None)
         if labels is not None:
