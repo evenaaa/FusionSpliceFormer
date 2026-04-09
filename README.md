@@ -23,7 +23,7 @@ We recommend that you use the package management tool **Anaconda** to configure 
 
 ```shell
 # create environment
-conda create -n env python=3.9.10 -y
+conda create -n env python=3.10.0 -y
 
 # activate environment
 conda activate env
@@ -44,6 +44,7 @@ Our model requires an assembly file and annotation databases to assist in locati
 ```shell
 # download
 wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_47/GRCh38.p14.genome.fa.gz
+
 # unzip
 gunzip GRCh38.p14.genome.fa.gz
 ```
@@ -55,23 +56,33 @@ After getting the fa files, we need to use samtools to build the index. Please m
 samtools faidx GRCh38.p14.genome.fa
 ```
 
-#### step 2: Download PhyloP annotation data
+#### step 2: Download PhyloP and PhastCons annotation data
 
 ```shell
 wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/phyloP100way/hg38.phyloP100way.bw
+wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/phastCons100way/hg38.phastCons100way.bw
 ```
 
-#### step 3: Download annotation data and trained model files
+#### step 3: Unzip gencode gtf annotation data
 
-Due to GitHub's data limitations, we have placed some annotation files and pre-trained model files in a cloud storage drive to provide users with the ability to download them and facilitate the reproduction of the project.
-```commandline
-https://pan.baidu.com/s/1Y5Y5FGSJm7FXnAUVfXdKhQ?pwd=cj3u
+```shell
+cd dataset/annodata/gtf
+unzip gencode.v47.anno.zip
 ```
+
+#### File Check
+make sure that the files listed in the table are present in the path of the "dataset" directory:
+
+- dataset/annodata/fa/GRCh38.p14.genome.fa
+- dataset/annodata/fa/GRCh38.p14.genome.fa.fai
+- dataset/annodata/conservation/hg38.phyloP100way.bw
+- dataset/annodata/conservation/hg38.phastCons100way.bw
+- dataset/annodata/gtf/gencode.v47.anno.gtf
 
 
 ## 2. usage
 
-### 2.1 features Annotation
+### 2.1 Preparing input data
 
 To run the data annotation file, you need to prepare a tab-delimited annotation input site file. 
 This file is the target file that you want to annotate. The format and content of the input file are as follows:
@@ -82,19 +93,13 @@ This file is the target file that you want to annotate. The format and content o
 | pos   |Start position of the variant on the chromosome|
 | ref   | Reference base(s) at the genomic position     |
 | alt   | Alternative base(s) observed in the sample    |
-| nm_id | RefSeq transcript accession number            |
 
-Also, if you only want to use it for testing purposes, you can first use the file located in the local path: ``dataset/toy.vcf``
-
-The feature annotations perform tokenization of numerical and sequence features on the target input file. The resulting feature data will be saved in ``toy.features.vcf`` and ``toy.seqIds.json``
-
-```shell
-python features/data_annotation.py -i toy.vcf -vcf toy.features.tsv -seq toy.seqIds.json
-```
+Also, if you only want to use it for testing purposes, you can use the file located in the local path: ``dataset/toy.vcf``
 
 ### 2.2 Annotate variants
-Run **predict.py** to predict mutation effects. 
+
+Run **FusionSpliceFormer.py** to predict mutation effects. 
 
 ```shell
-python predict/predict.py -vcf toy.features.tsv -seq toy.seqIds.json -o toy.predict.tsv
+python FusionSpliceFormer.py -vcf dataset/toy.vcf -seq -out dataset/toy.predict.csv
 ```

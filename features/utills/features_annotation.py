@@ -3,149 +3,204 @@
 # @Time    : 2025/11/30 20:46
 # @Author  : even
 # @File    : features_annotation.py
-from utills.get_r import *
-from utills.load_data import *
-from utills.get_mes_score5 import get_score5
-from utills.get_mes_score3 import get_score3
-from utills.get_esr import *
-from utills.get_phyloP import *
+from features.utills.load_data import *
+from features.utills.get_phyloP import *
+from features.utills.exon_annotation import get_bed_annotation
+import math
 
-def get_base400altseq(alt,pos,refseq,region):
-    region_start = int(region.split(':')[1].split('-')[0]) + 1
-    relative_pos = int(pos - region_start)
-    preseq = refseq[:relative_pos]
-    endseq = refseq[relative_pos + 1:]
-    altseq = preseq + alt + endseq
+def format_text_to_dict(text):
+    key_value_pairs = text.rstrip(';').split('; ')
+    result_dict = {}
 
-    return altseq
+    for pair in key_value_pairs:
+        key, value_str = pair.split(' ', 1)
+        pure_value = value_str.strip('"')
+        result_dict[key] = pure_value
+    return result_dict
 
-# mes
-def get_mes_altseq(pos,mes_location,mes_seq,alt):
-    location_start=int(mes_location.split(':')[1].split('-')[0])+1
-    location_end=int(mes_location.split(':')[1].split('-')[1])
-    if pos>=location_start and pos<=location_end:
-        relative_pos=pos-location_start
-        seq1=mes_seq[:relative_pos]
-        seq3=mes_seq[relative_pos+1:]
-        altseq=seq1+alt+seq3
+def get_region_dict(region,acceptor_info,donor_info):
+    if region=='acceptor':
+        region_info=acceptor_info
+    elif region=='donor':
+        region_info=donor_info
+    region_dict=format_text_to_dict(region_info)
+    return region_dict
+
+def get_dis(pos,region,strand,exon_start,exon_end):
+    if strand=='+':
+        if region=='acceptor':
+            if pos>=exon_start:
+                dis=pos-exon_start+1
+            else:
+                dis=pos-exon_start
+        elif region=='donor':
+            if pos<=exon_end:
+                dis=pos-exon_end-1
+            else:
+                dis=pos-exon_end
+    elif strand=='-':
+        if region=='acceptor':
+            if pos <= exon_end:
+                dis = pos - exon_end - 1
+            else:
+                dis = pos - exon_end
+        elif region=='donor':
+            if pos >= exon_start:
+                dis = pos - exon_start + 1
+            else:
+                dis = pos - exon_start
     else:
-        altseq=mes_seq
-    return altseq
+        dis=0
+    return dis
 
-def get_messcores(mes_seq,region,mes3dict,mes5dict):
-    if region=='donor':
-        mes_score=get_score5(mes_seq,mes5dict)
-    elif region=='acceptor':
-        mes_score=get_score3(mes_seq,mes3dict)
-    return mes_score
+def log_intron_length(intron_length, base='ln'):
+    if intron_length < 0:
+        raise ValueError("intron_length must be >= 0")
+    if base == 'log10':
+        return math.log10(intron_length + 1)
+    elif base == 'ln':
+        return math.log(intron_length + 1)
+    else:
+        raise ValueError("base must be 'log10' or 'ln'")
 
-def get_mes_features(strand,mes_seq,alt,pos,mes_location,region,mes3dict,mes5dict):
-    mes_refseq = get_strand_seq(strand, mes_seq)
-    mes_altseq = get_mes_altseq(pos, mes_location, mes_seq, alt)
-    mes_altseq = get_strand_seq(strand, mes_altseq)
-    mes_ref = get_messcores(mes_refseq, region, mes3dict, mes5dict)
-    mes_alt = get_messcores(mes_altseq, region, mes3dict, mes5dict)
-    diffrence_mes = mes_alt - mes_ref
-    relative_mes=get_relative_score(refscore=mes_ref,altscore=mes_alt)
+def get_intron_data(strand,region,exon_start,exon_end,last_exon_end,next_exon_start):
+    if last_exon_end==0:
+        last_intron_length=0
+    else:
+        last_intron_length=abs(int(exon_start)-int(last_exon_end))
 
-    messcores_list = [mes_ref, mes_alt, diffrence_mes,relative_mes]
+    if next_exon_start==0:
+        next_intron_length=0
+    else:
+        next_intron_length=abs(int(next_exon_start)-int(exon_end))
 
-    return messcores_list
+    if strand=='+':
+        if region=='acceptor':
+            intron_length=last_intron_length
+        elif region=='donor':
+            intron_length=next_intron_length
+    elif strand=='-':
+        if region=='acceptor':
+            intron_length=next_intron_length
+        elif region=='donor':
+            intron_length=last_intron_length
+    intron_length_logp=log_intron_length(intron_length)
 
+    return intron_length, intron_length_logp
 
-def features_annotation(gtf_df,feature_path='dataset/annodata/merge.features.txt'):
+def get_flanking_start_end(strand,region_da,boundary,FLANKING_LEN=200):
+    r_region_dict = {
+        'donor_+': [boundary - FLANKING_LEN+1, boundary + FLANKING_LEN+1],
+        'donor_-': [boundary - FLANKING_LEN-2, boundary + FLANKING_LEN-2],
+        'acceptor_+': [boundary - FLANKING_LEN-2, boundary + FLANKING_LEN -2],
+        'acceptor_-': [boundary - FLANKING_LEN+1, boundary + FLANKING_LEN+1],
+    }
+    key=region_da+'_'+strand
+    start = r_region_dict[key][0]
+    end = r_region_dict[key][1]
+    return [start,end]
 
-    # freq matrix
-    donor_freq_matrix,acceptor_freq_matrix=get_region_freq_matrix(gtf_df)
-
-    # esr dict
-    esr_dict = load_data_esr_dict()
-
-    # mes dict
-    mes5dict=load_data_mes5dict()
-    mes3dict=load_data_mes3dict()
+def features_annotation(variant_df,region='acceptor'):
+    # fasta
+    genome=get_fasta()
 
     # phyloP100
-    bw=load_data_phylop()
+    bw_phyloP=load_data_phylop()
+
+    # phastCons100way
+    bw_phastCons=load_data_phastCons()
 
     # create new df
-    # 选取指定的列创建新的 DataFrame
-    basic_columns = ['chrom', 'pos', 'ref', 'alt',  'region',
-                    'strand','gene_id', 'refseq_ts_id', 'gene_name','dis']
-    feature_df = gtf_df[basic_columns]
+    basic_columns = ['chrom', 'pos', 'ref', 'alt','transcript']
+    feature_df = variant_df[basic_columns]
 
-    for idx,row in gtf_df.iterrows():
+    for idx,row in variant_df.iterrows():
         #----------------------
         #-------data load------
         #----------------------
         # index	pos_key	chrom	pos	ref	alt	NM_id source_ExtremeSplicing_variant_class_clinvar
         chrom=str(row['chrom'])
         pos=int(row['pos'])
-        exon_start=row['exon_start']
-        exon_end=row['exon_end']
-        strand=row['strand']
         ref=row['ref'].upper()
         alt=row['alt'].upper()
-        region=row['region']
 
-        r_seq=row['r_seq'].upper()
-        r_location=row['r_location']
-        r_freq_location=row['base400_location']
-        r_freq_seq=row['base400_seq'].upper()
-        # print(chrom,pos,ref,alt)
-        # print('base400_seq',row['base400_seq'])
-        # print(f'r_sw_seq',row['r_sw_seq'])
-        r_sw_seq = row['r_sw_seq'].upper()
-        r_next_seq=str(row['r_next_seq']).upper()
+        acceptor_info, donor_info=row['acceptor_info'],row['donor_info']
 
+        region_dict=get_region_dict(region,acceptor_info,donor_info)
+        exon_start,exon_end=int(region_dict['start']),int(region_dict['end'])
+        strand=region_dict['strand']
 
-        esr_seq=row['esr_seq'].upper()
-        mes_seq=row['mes_seq'].upper()
-        mes_location=row['mes_location']
+        acceptor_info=row['acceptor_info']
+        donor_info=row['donor_info']
+        acceptor_dict=format_text_to_dict(acceptor_info)
+        donor_dict=format_text_to_dict(donor_info)
+        if region=='acceptor':
+            region_dict=acceptor_dict
+            boundary=int(region_dict['acceptor_pos'])
+        elif region=='donor':
+            region_dict=donor_dict
+            boundary=int(region_dict['donor_pos'])
+        longseq_start, longseq_end = get_flanking_start_end(strand, region, boundary, FLANKING_LEN=5000)
+        longseq=genome["chr"+chrom][longseq_start:longseq_end].seq
+
         #----------------------------------------------------------------------------------------
         #--------------------------------get features data---------------------------------------
         #----------------------------------------------------------------------------------------
-
-        # 1.exon length
+        # dis
+        dis=get_dis(pos,region,strand,exon_start,exon_end)
+        # exon_rank
+        exon_rank=int(region_dict['exon_number'])
+        # exon_last
+        exon_count=int(region_dict['exon_count'])
+        if exon_count-exon_rank==0:
+            exon_last=1
+        else:
+            exon_last=0
+        # exon_length/exon_length_mod3
         exon_length=exon_end-exon_start+1
         exon_length_mod3=exon_length%3
-        basic_list=[exon_length,exon_length_mod3]
-        feature_df.loc[idx,['exon_length','exon_length_mod3']]=basic_list
+        # intron_length
+        # intron_length_logp
+        last_exon_end,next_exon_start=region_dict.get('prev_exon_end',0),region_dict.get('Next_exon_start',0)
+        intron_length,intron_length_logp=get_intron_data(strand,region,exon_start,exon_end,last_exon_end,next_exon_start)
+        # gc
+        gc_5, gc_10, gc_25, gc_50, gc_100, gc_200 = compute_multi_gc(longseq)
+        # merge
+        basic_list=[strand,dis,exon_rank,exon_last,exon_length,exon_length_mod3,intron_length,intron_length_logp,gc_5, gc_10, gc_25, gc_50, gc_100, gc_200]
+        feature_df.loc[idx,['strand','dis','exon_rank','exon_last','exon_length','exon_length_mod3','intron_length','intron_length_logp','gc_5', 'gc_10', 'gc_25', 'gc_50', 'gc_100', 'gc_200']]=basic_list
 
-        # 2. Rican ref:Information content (Ri) of the closest canonical donor site.
-        # ri_can_ref, ri_can_alt, difference_ri_can, relative_ri_can,
-        #                      max_Ri_cryptic_donor_window_ref, max_Ri_cryptic_donor_window_alt, difference_ri_crypt,relative_ri_crypt,
-        #                      difference_r_next
-        r_scores_list = get_r_features(strand, r_seq, pos, alt, region, r_location, donor_freq_matrix,
-                                       acceptor_freq_matrix,r_sw_seq, r_freq_location, r_freq_seq, r_next_seq,ref)
-        feature_df.loc[idx, ['ri_can_ref', 'ri_can_alt', 'diff_ri_can', 'relative_ri_can',
-                     'max_Ri_cryptic_donor_window_ref', 'max_Ri_cryptic_donor_window_alt', 'diff_ri_crypt','relative_ri_crypt',
-                     'diff_r_next']] = r_scores_list
+        # phyloP phastCons
+        phylop_score=get_phylop_score(bw_phyloP, chrom, pos)
+        # phastCons
+        pc_5,pc_10,pc_20,pc_50=get_phastCons_score(bw_phastCons,chrom,pos)
+        feature_df.loc[idx, ['phylop_score','phastCons_5','phastCons_10','phastCons_20','phastCons_50']] =[phylop_score,pc_5,pc_10,pc_20,pc_50]
 
-        # 3.esr:ese_ref, ese_alt, ess_ref, ess_alt, differnce_refesr, differnce_altesr, differnce_esr,relative_esr
-        esrscores_list=get_esr_features(strand,esr_seq,alt,esr_dict)
-        feature_df.loc[idx, ['ese_ref', 'ese_alt', 'ess_ref', 'ess_alt', 'diff_refesr', 'diff_altesr', 'diff_esr',
-                         'relative_esr']] =esrscores_list
-
-        # 4.maxentscan:mes_ref, mes_alt, diffrence_mes,relative_mes
-        messcores_list=get_mes_features(strand,mes_seq,alt,pos,mes_location,region,mes3dict,mes5dict)
-        feature_df.loc[idx, ['mes_ref', 'mes_alt', 'diff_mes','relative_mes']] =messcores_list
-
-        # 5.phyloP
-        phylop_score=get_phylop_score(bw, chrom, pos)
-        feature_df.loc[idx, ['phylop_score']] =phylop_score
-
-        # 6.seq 400bp
-        base400_refseq=row['base400_seq'].upper()
-        base400_location=row['base400_location']
-        feature_df.loc[idx, ['base400_refseq']] =base400_refseq
-        base400_altseq=get_base400altseq(alt=alt,pos=pos,refseq=base400_refseq,region=base400_location)
-        feature_df.loc[idx, ['base400_altseq']] =base400_altseq
-
-        #--------------------------------------------------------------------------------
-        #------------------------------output--------------------------------------------
-        #--------------------------------------------------------------------------------
-        # print(idx,chrom,pos,ref,alt)
-    feature_df.to_csv(feature_path,sep='\t',index=False)
-    close_bw(bw)
+        # longseq
+        refseq=longseq.upper()
+        feature_df.loc[idx, ['refseq']] =refseq
+    close_bw(bw_phyloP)
+    close_bw(bw_phastCons)
     return feature_df
+
+def main():
+
+    variant_path='../../dataset/toy.gtf.txt'
+    feature_path = '../../dataset/toy.features.donor.txt'
+
+    variant_df=get_bed_annotation(
+        variant_path=variant_path,
+    )
+
+    feature_acceptor_df=features_annotation(
+        variant_df=variant_df,
+        feature_path=feature_path,
+        region='acceptor')
+
+    feature_donor_df=features_annotation(
+        variant_df=variant_df,
+        feature_path=feature_path,
+        region='donor')
+
+
+if __name__ == '__main__':
+    main()
