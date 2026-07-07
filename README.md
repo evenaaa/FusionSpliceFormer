@@ -101,5 +101,5 @@ Also, if you only want to use it for testing purposes, you can use the file loca
 Run **FusionSpliceFormer.py** to predict mutation effects. 
 
 ```shell
-python FusionSpliceFormer.py -vcf dataset/toy.vcf -seq -out dataset/toy.predict.csv
+python FusionSpliceFormer.py -vcf dataset/toy.vcf -out dataset/toy.predict.csv
 ```
