@@ -106,7 +106,7 @@ CHROM  POS  REF  ALT  GENE  TRANSCRIPTS  SITE_POS  STRAND  SITE_TYPE  SCORE  PRE
 - `PREDICTION`: **Pathogenic** if the score ≥0.5, otherwise **Benign**; **Not_scored** if unavailable.
 - Gene, transcript and site columns describe the reported target. `SITE_POS` is its 1-based exon boundary; multiple transcript IDs are separated by `;`.
 
-Scores are for computational screening, not clinical diagnoses or calibrated pathogenicity probabilities.
+Predictions are intended for research and variant prioritization, not clinical diagnosis.
 
 To output **all target-site results** instead:
 
