@@ -1,0 +1,14 @@
+{
+  "checkpoints": [
+    "model_01.pt",
+    "model_02.pt",
+    "model_03.pt",
+    "model_04.pt",
+    "model_05.pt",
+    "model_06.pt",
+    "model_07.pt",
+    "model_08.pt",
+    "model_09.pt",
+    "model_10.pt"
+  ]
+}

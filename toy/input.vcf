@@ -1,0 +1,9 @@
+##fileformat=VCFv4.2
+##reference=GRCh38
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr1	8360846	.	G	C	.	PASS	.
+chr1	7937682	.	A	T	.	PASS	.
+chr1	51791663	.	T	C	.	PASS	.
+chr1	51816311	.	C	T	.	PASS	.
+chr15	100341001	.	G	T	.	PASS	.
+chrX	108665504	.	T	G	.	PASS	.
